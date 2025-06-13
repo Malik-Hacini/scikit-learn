@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from ._isomap import Isomap
+from ._laplacian import Laplacian
 from ._locally_linear import LocallyLinearEmbedding, locally_linear_embedding
 from ._mds import MDS, smacof
 from ._spectral_embedding import SpectralEmbedding, spectral_embedding
@@ -13,6 +14,7 @@ __all__ = [
     "MDS",
     "TSNE",
     "Isomap",
+    "Laplacian",
     "LocallyLinearEmbedding",
     "SpectralEmbedding",
     "locally_linear_embedding",

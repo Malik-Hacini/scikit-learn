@@ -24,6 +24,7 @@ from ..utils._arpack import _init_arpack_v0
 from ..utils._param_validation import Interval, StrOptions, validate_params
 from ..utils.extmath import _deterministic_vector_sign_flip
 from ..utils.fixes import laplacian as csgraph_laplacian
+from ._laplacian import Laplacian
 from ..utils.fixes import parse_version, sp_version
 from ..utils.validation import validate_data
 
@@ -303,10 +304,11 @@ def _spectral_embedding(
     eigen_solver=None,
     random_state=None,
     eigen_tol="auto",
-    norm_laplacian=True,
+    norm_laplacian=True, #no way to choose DELETE
     drop_first=True,
+    standard=True
 ):
-    adjacency = check_symmetric(adjacency)
+    #adjacency = check_symmetric(adjacency)
 
     if eigen_solver == "amg":
         try:
@@ -329,9 +331,11 @@ def _spectral_embedding(
             "Graph is not fully connected, spectral embedding may not work as expected."
         )
 
-    laplacian, dd = csgraph_laplacian(
-        adjacency, normed=norm_laplacian, return_diag=True
-    )
+    if norm_laplacian:
+        laplacian, dd = Laplacian(adjacency, standard = standard).normalized()
+    else:
+        laplacian, dd = Laplacian(adjacency, standard = standard).unnormalized()
+    print("Laplacian:", laplacian)
     if eigen_solver == "arpack" or (
         eigen_solver != "lobpcg"
         and (not sparse.issparse(laplacian) or n_nodes < 5 * n_components)

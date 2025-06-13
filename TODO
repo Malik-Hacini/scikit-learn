@@ -1,0 +1,4 @@
+- Perf : x10 plus lent ...
+- Refactor : code horrible (a voir comment refactor lundi)
+- Remplacer eigsh par eig si standard=False
+- Test generalized 

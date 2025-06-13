@@ -631,6 +631,8 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
         "kernel_params": [dict, None],
         "n_jobs": [Integral, None],
         "verbose": ["verbose"],
+        "standard": [bool]
+        
     }
 
     def __init__(
@@ -651,6 +653,7 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
         kernel_params=None,
         n_jobs=None,
         verbose=False,
+        standard=True
     ):
         self.n_clusters = n_clusters
         self.eigen_solver = eigen_solver
@@ -667,6 +670,7 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
         self.kernel_params = kernel_params
         self.n_jobs = n_jobs
         self.verbose = verbose
+        self.standard = standard
 
     @_fit_context(prefer_skip_nested_validation=True)
     def fit(self, X, y=None):
@@ -710,17 +714,24 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
                 "set ``affinity=precomputed``."
             )
 
+
+        """SYMMETRISATION FAITE ICI """
         if self.affinity == "nearest_neighbors":
             connectivity = kneighbors_graph(
                 X, n_neighbors=self.n_neighbors, include_self=True, n_jobs=self.n_jobs
             )
-            self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
+            if self.standard:
+                self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
+
         elif self.affinity == "precomputed_nearest_neighbors":
             estimator = NearestNeighbors(
                 n_neighbors=self.n_neighbors, n_jobs=self.n_jobs, metric="precomputed"
             ).fit(X)
             connectivity = estimator.kneighbors_graph(X=X, mode="connectivity")
-            self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
+            
+            if self.standard:
+                self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
+                
         elif self.affinity == "precomputed":
             self.affinity_matrix_ = X
         else:
@@ -752,6 +763,7 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
             random_state=random_state,
             eigen_tol=self.eigen_tol,
             drop_first=False,
+            standard=self.standard,
         )
         if self.verbose:
             print(f"Computing label assignment using {self.assign_labels}")

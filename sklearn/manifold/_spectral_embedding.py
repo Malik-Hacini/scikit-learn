@@ -8,9 +8,9 @@ from numbers import Integral, Real
 
 import numpy as np
 from scipy import sparse
-from scipy.linalg import eigh
+from scipy.linalg import eigh, issymmetric
 from scipy.sparse.csgraph import connected_components
-from scipy.sparse.linalg import eigsh, lobpcg
+from scipy.sparse.linalg import eigs, eigsh, lobpcg
 
 from ..base import BaseEstimator, _fit_context
 from ..metrics.pairwise import rbf_kernel
@@ -159,8 +159,10 @@ def _set_diag(laplacian, value, norm_laplacian):
         "eigen_solver": [StrOptions({"arpack", "lobpcg", "amg"}), None],
         "random_state": ["random_state"],
         "eigen_tol": [Interval(Real, 0, None, closed="left"), StrOptions({"auto"})],
-        "norm_laplacian": ["boolean"],
         "drop_first": ["boolean"],
+        "laplacian_method": [
+            StrOptions({"norm", "random_walk", "unnorm"}),
+        ],
     },
     prefer_skip_nested_validation=True,
 )
@@ -171,7 +173,7 @@ def spectral_embedding(
     eigen_solver=None,
     random_state=None,
     eigen_tol="auto",
-    norm_laplacian=True,
+    laplacian_method="random_walk",
     drop_first=True,
 ):
     """Project the sample on the first eigenvectors of the graph Laplacian.
@@ -292,8 +294,8 @@ def spectral_embedding(
         eigen_solver=eigen_solver,
         random_state=random_state,
         eigen_tol=eigen_tol,
-        norm_laplacian=norm_laplacian,
-        drop_first=drop_first,
+        laplacian_method=laplacian_method,
+        drop_first=drop_first
     )
 
 
@@ -304,9 +306,9 @@ def _spectral_embedding(
     eigen_solver=None,
     random_state=None,
     eigen_tol="auto",
-    norm_laplacian=True, #no way to choose DELETE
     drop_first=True,
-    standard=True
+    standard=False,
+    laplacian_method="random_walk"
 ):
     #adjacency = check_symmetric(adjacency)
 
@@ -331,10 +333,13 @@ def _spectral_embedding(
             "Graph is not fully connected, spectral embedding may not work as expected."
         )
 
-    if norm_laplacian:
+    if laplacian_method == "norm":
         laplacian, dd = Laplacian(adjacency, standard = standard).normalized()
+    if laplacian_method == "random_walk":
+        laplacian, dd = Laplacian(adjacency, standard = standard).random_walk()
     else:
         laplacian, dd = Laplacian(adjacency, standard = standard).unnormalized()
+    
     print("Laplacian:", laplacian)
     if eigen_solver == "arpack" or (
         eigen_solver != "lobpcg"
@@ -346,7 +351,7 @@ def _spectral_embedding(
         # /lobpcg/lobpcg.py#L237
         # or matlab:
         # https://www.mathworks.com/matlabcentral/fileexchange/48-lobpcg-m
-        laplacian = _set_diag(laplacian, 1, norm_laplacian)
+        laplacian = _set_diag(laplacian, 1, laplacian_method == "norm")
 
         # Here we'll use shift-invert mode for fast eigenvalues
         # (see https://docs.scipy.org/doc/scipy/reference/tutorial/arpack.html
@@ -371,13 +376,20 @@ def _spectral_embedding(
             laplacian = check_array(
                 laplacian, accept_sparse="csr", accept_large_sparse=False
             )
-            _, diffusion_map = eigsh(
-                laplacian, k=n_components, sigma=1.0, which="LM", tol=tol, v0=v0
-            )
+
+            if issymmetric(laplacian):  
+                _, diffusion_map = eigsh(
+                    laplacian, k=n_components, sigma=1.0, which="LM", tol=tol, v0=v0
+                )
+            else:
+                _, diffusion_map = eigs(
+                    laplacian, k=n_components, sigma=1.0, which="LM", tol=tol, v0=v0
+                )
             embedding = diffusion_map.T[n_components::-1]
-            if norm_laplacian:
+            if laplacian_method == "norm":
                 # recover u = D^-1/2 x from the eigenvector output x
                 embedding = embedding / dd
+            print("VP", embedding)
         except RuntimeError:
             # When submatrices are exactly singular, an LU decomposition
             # in arpack fails. We fallback to lobpcg
@@ -393,7 +405,7 @@ def _spectral_embedding(
         laplacian = check_array(
             laplacian, dtype=[np.float64, np.float32], accept_sparse=True
         )
-        laplacian = _set_diag(laplacian, 1, norm_laplacian)
+        laplacian = _set_diag(laplacian, 1, laplacian_method == "norm")
 
         # The Laplacian matrix is always singular, having at least one zero
         # eigenvalue, corresponding to the trivial eigenvector, which is a
@@ -422,7 +434,7 @@ def _spectral_embedding(
         tol = None if eigen_tol == "auto" else eigen_tol
         _, diffusion_map = lobpcg(laplacian, X, M=M, tol=tol, largest=False)
         embedding = diffusion_map.T
-        if norm_laplacian:
+        if laplacian_method == "norm":
             # recover u = D^-1/2 x from the eigenvector output x
             embedding = embedding / dd
         if embedding.shape[0] == 1:
@@ -440,11 +452,11 @@ def _spectral_embedding(
                 laplacian = laplacian.toarray()
             _, diffusion_map = eigh(laplacian, check_finite=False)
             embedding = diffusion_map.T[:n_components]
-            if norm_laplacian:
+            if laplacian_method == "norm":
                 # recover u = D^-1/2 x from the eigenvector output x
                 embedding = embedding / dd
         else:
-            laplacian = _set_diag(laplacian, 1, norm_laplacian)
+            laplacian = _set_diag(laplacian, 1, laplacian_method == "norm")
             # We increase the number of eigenvectors requested, as lobpcg
             # doesn't behave well in low dimension and create initial
             # approximation X to eigenvectors
@@ -458,7 +470,7 @@ def _spectral_embedding(
                 laplacian, X, tol=tol, largest=False, maxiter=2000
             )
             embedding = diffusion_map.T[:n_components]
-            if norm_laplacian:
+            if laplacian_method=="norm":
                 # recover u = D^-1/2 x from the eigenvector output x
                 embedding = embedding / dd
             if embedding.shape[0] == 1:

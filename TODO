@@ -1,4 +1,3 @@
-- Perf : x10 plus lent ...
+- Perf : 60% plus lent ...
 - Refactor : code horrible (a voir comment refactor lundi)
-- Remplacer eigsh par eig si standard=False
-- Test generalized 
+- Random walk fix bugs

@@ -8,7 +8,7 @@ class Laplacian:
     https://doi.org/10.48550/arXiv.2203.03221 (link to update)
     The so-called "generalized Laplacians" parameters can be tuned to coincide with the classical unidrected Laplacians."""
 
-    def __init__(self, adjacency_matrix, standard=True, measure=(3,0.7,0.9)):
+    def __init__(self, adjacency_matrix, standard=False, measure=(3,0.7,0.9)):
         """
         Initializes the Laplacian class with the adjacency matrix.
         
@@ -95,7 +95,7 @@ class Laplacian:
         """
         L_v = self.unnormalized()[0]
         L_rw_v = self.inv_sqrt_D_v_xi() @ L_v
-        return L_rw_v, np.sqrt(self.D_v_xi())
+        return L_rw_v, np.diag(L_rw_v)
 
 
     

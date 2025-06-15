@@ -631,7 +631,10 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
         "kernel_params": [dict, None],
         "n_jobs": [Integral, None],
         "verbose": ["verbose"],
-        "standard": [bool]
+        "standard": [bool],
+        "laplacian_method": [
+            StrOptions({"random_walk", "unnorm", "norm"})
+        ],
         
     }
 
@@ -653,7 +656,8 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
         kernel_params=None,
         n_jobs=None,
         verbose=False,
-        standard=True
+        standard=False,
+        laplacian_method="random_walk"
     ):
         self.n_clusters = n_clusters
         self.eigen_solver = eigen_solver
@@ -671,6 +675,7 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.standard = standard
+        self.laplacian_method = laplacian_method
 
     @_fit_context(prefer_skip_nested_validation=True)
     def fit(self, X, y=None):
@@ -764,6 +769,7 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
             eigen_tol=self.eigen_tol,
             drop_first=False,
             standard=self.standard,
+            laplacian_method=self.laplacian_method
         )
         if self.verbose:
             print(f"Computing label assignment using {self.assign_labels}")

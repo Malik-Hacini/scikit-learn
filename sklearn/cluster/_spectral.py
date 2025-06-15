@@ -720,13 +720,15 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
             )
 
 
-        """SYMMETRISATION FAITE ICI """
         if self.affinity == "nearest_neighbors":
             connectivity = kneighbors_graph(
-                X, n_neighbors=self.n_neighbors, include_self=True, n_jobs=self.n_jobs
+                X, n_neighbors=self.n_neighbors, include_self=True, n_jobs=self.n_jobs,
             )
+            print("connectivity", connectivity)
             if self.standard:
                 self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
+            else:
+                self.affinity_matrix_ = connectivity
 
         elif self.affinity == "precomputed_nearest_neighbors":
             estimator = NearestNeighbors(
@@ -736,6 +738,8 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
             
             if self.standard:
                 self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
+            else:
+                self.affinity_matrix_ = connectivity
                 
         elif self.affinity == "precomputed":
             self.affinity_matrix_ = X

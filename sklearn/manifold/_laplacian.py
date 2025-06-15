@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.sparse import issparse
 
 class Laplacian:
     """
@@ -18,6 +18,7 @@ class Laplacian:
             measure (tuple[float, float, float]) : The parameters of the vertex measure used for the Laplacians, respectively (t, alpha, gamma).   
         """
         self.adjacency_matrix = adjacency_matrix
+        print("Adjacency Matrix", adjacency_matrix)
         self.N = adjacency_matrix.shape[0]  # Number of nodes in the graph
         if standard:
             self.measure = (1,1,1) # Measure defining the standard Laplacians.
@@ -26,7 +27,11 @@ class Laplacian:
         
         """Compute the matrices necessary for all generalized Laplacians."""
         t,alpha,gamma = self.measure
-        D = np.diag(np.sum(self.adjacency_matrix, axis=1))
+        if issparse(self.adjacency_matrix):
+            D = np.diag(self.adjacency_matrix.sum(axis=1).A1)
+        else:
+            D = np.diag(self.adjacency_matrix.sum(axis=1))
+        print("D", D)
         P = np.linalg.inv(D) @ self.adjacency_matrix
         P_gamma=gamma*P + ((1-gamma)*1/self.N)*np.ones((self.N,self.N))
         v=(((1/self.N)*np.matmul(np.ones((1,self.N)),np.linalg.matrix_power(P_gamma,t)))**alpha).transpose()

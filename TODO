@@ -1,3 +1,4 @@
 - Perf : 60% plus lent ...
 - Refactor : code horrible (a voir comment refactor lundi)
 - Random walk fix bugs
+- Rendre knn utilisable avec gaussian kernel

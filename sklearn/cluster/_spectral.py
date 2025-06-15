@@ -776,7 +776,7 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
 
         if self.assign_labels == "kmeans":
             _, self.labels_, _ = k_means(
-                maps,
+                maps.real,
                 self.n_clusters,
                 random_state=random_state,
                 n_init=self.n_init,

@@ -88,13 +88,14 @@ class Laplacian:
 
     def random_walk(self):
         """
-        Computes the random walk generalized Laplacian matrix L_rw_v = D_{v+xi}^(-1/2)*L_v 
+        Computes the random walk generalized Laplacian matrix L_rw_v = D_{v+xi}^(-1)*L_v 
 
         Returns:
-            tuple(ndarray): (L, D)
+            tuple(ndarray): (L_rw_v, D)
         """
         L_v = self.unnormalized()[0]
-        L_rw_v = self.inv_sqrt_D_v_xi() @ L_v
+
+        L_rw_v = np.diag(1/np.diag(self.D_v_xi())) @ L_v
         return L_rw_v, np.diag(L_rw_v)
 
 

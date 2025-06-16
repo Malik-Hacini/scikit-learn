@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse import issparse, diags_array
-from scipy.sparse.linalg import spsolve
+
 
 class Laplacian:
     """
@@ -45,15 +45,6 @@ class Laplacian:
         self.xi_vector = xi
         self.v_xi_sum = self.v_vector + self.xi_vector
    
-     
-    def inv_sqrt_v_xi_sum(self):
-        """
-        Computes the inverse square root of the measure transition vector v + xi.
-
-        Returns:
-            ndarray: The inverse square root diagonal vector.
-        """
-        return 1.0 / np.sqrt(self.v_xi_sum)
     
     def unnormalized(self):
         """
@@ -68,13 +59,13 @@ class Laplacian:
         if self.is_sparse:
             D_v_xi = diags_array(self.v_xi_sum)
             D_v = diags_array(self.v_vector)
-            L_v = D_v_xi - (D_v @ P + P.T @ D_v)
-            diag = L_v.diagonal()
+            
         else:
             D_v_xi = np.diag(self.v_xi_sum)
             D_v = np.diag(self.v_vector)
-            L_v = D_v_xi - (D_v @ P + P.T @ D_v) 
-            diag = np.diag(L_v)
+        
+        L_v = D_v_xi - (D_v @ P + P.T @ D_v)
+        diag = L_v.diagonal() if self.is_sparse else np.diag(L_v)
         
         return L_v, diag
     
@@ -86,16 +77,10 @@ class Laplacian:
             tuple: (L_norm_v, sqrt(diagonal of D_{v+xi}))
         """
         L_v, _ = self.unnormalized()
-        inv_sqrt_v_xi_sum = self.inv_sqrt_v_xi_sum()
-        
-        if self.is_sparse:
-            inv_sqrt_D_v_xi = diags_array(inv_sqrt_v_xi_sum)
-            L_norm_v = inv_sqrt_D_v_xi @ L_v @ inv_sqrt_D_v_xi
-        else:
-            inv_sqrt_D_v_xi = np.diag(inv_sqrt_v_xi_sum)
-            L_norm_v = inv_sqrt_D_v_xi @ L_v @ inv_sqrt_D_v_xi
+        sqrt_v_xi_sum = np.sqrt(self.v_xi_sum)
+        L_norm_v = L_v / (sqrt_v_xi_sum[:, np.newaxis] * sqrt_v_xi_sum[np.newaxis, :])
             
-        return L_norm_v, np.sqrt(self.v_xi_sum)
+        return L_norm_v, sqrt_v_xi_sum
 
     def random_walk(self):
         """
@@ -105,16 +90,8 @@ class Laplacian:
             tuple: (L_rw_v, diagonal of L_rw_v)
         """
         L_v, _ = self.unnormalized()
-        inv_d_v_xi = 1.0 / self.v_xi_sum
-        
-        if self.is_sparse:
-            inv_D_v_xi = diags_array(inv_d_v_xi)
-            L_rw_v = inv_D_v_xi @ L_v
-            diag = L_rw_v.diagonal()
-        else:
-            inv_D_v_xi = np.diag(inv_d_v_xi)
-            L_rw_v = inv_D_v_xi @ L_v
-            diag = np.diag(L_rw_v)
+        L_rw_v = L_v / self.v_xi_sum[:, np.newaxis]     
+        diag = L_rw_v.diagonal() if self.is_sparse else np.diag(L_rw_v)
             
         return L_rw_v, diag
     

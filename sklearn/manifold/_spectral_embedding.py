@@ -8,7 +8,7 @@ from numbers import Integral, Real
 
 import numpy as np
 from scipy import sparse
-from scipy.linalg import eigh, issymmetric
+from scipy.linalg import eigh
 from scipy.sparse.csgraph import connected_components
 from scipy.sparse.linalg import eigs, eigsh, lobpcg
 
@@ -377,7 +377,7 @@ def _spectral_embedding(
                 laplacian, accept_sparse="csr", accept_large_sparse=False
             )
 
-            if issymmetric(laplacian):  
+            if check_symmetric(laplacian, return_bool=True):  
                 _, diffusion_map = eigsh(
                     laplacian, k=n_components, sigma=1.0, which="LM", tol=tol, v0=v0
                 )
@@ -387,8 +387,9 @@ def _spectral_embedding(
                 )
             embedding = diffusion_map.T[n_components::-1]
             if laplacian_method == "norm":
-                # recover u = D^-1/2 x from the eigenvector output x
+                #recover u = D^-1/2 x from the eigenvector output x
                 embedding = embedding / dd
+                
             print("VP", embedding)
         except RuntimeError:
             # When submatrices are exactly singular, an LU decomposition

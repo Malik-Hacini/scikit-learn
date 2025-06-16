@@ -1,107 +1,147 @@
 import numpy as np
-from scipy.sparse import issparse
+from scipy.sparse import issparse, diags_array
+from scipy.sparse.linalg import spsolve
 
 class Laplacian:
     """
     A class to compute the possible Laplacian matrices of a directed graph.
     Based on the "Generalized Spectral Clustering" paper at  	
     https://doi.org/10.48550/arXiv.2203.03221 (link to update)
-    The so-called "generalized Laplacians" parameters can be tuned to coincide with the classical unidrected Laplacians."""
+    The so-called "generalized Laplacians" parameters can be tuned to coincide with the classical undirected Laplacians."""
 
-    def __init__(self, adjacency_matrix, standard=False, measure=(3,0.7,0.9)):
+    def __init__(self, adjacency, standard=False, measure=(3,0.7,1)):
         """
         Initializes the Laplacian class with the adjacency matrix.
         
         Args:
-            adjacency_matrix (ndarray): The adjacency matrix of the graph.
+            adjacency (ndarray): The adjacency matrix of the graph.
             standard (bool): If True, uses the standard Laplacian measure (1, 1, 1). Defaults to False.
             measure (tuple[float, float, float]) : The parameters of the vertex measure used for the Laplacians, respectively (t, alpha, gamma).   
         """
-        self.adjacency_matrix = adjacency_matrix
-        print("Adjacency Matrix", adjacency_matrix)
-        self.N = adjacency_matrix.shape[0]  # Number of nodes in the graph
-        if standard:
-            self.measure = (1,1,1) # Measure defining the standard Laplacians.
-        else:
-            self.measure = measure
-        
+        self.adjacency = adjacency
+        print("Adjacency Matrix", adjacency)
+        self.N = adjacency.shape[0]  # Number of nodes in the graph
+        self.measure=measure
         """Compute the matrices necessary for all generalized Laplacians."""
-        t,alpha,gamma = self.measure
-        if issparse(self.adjacency_matrix):
-            D = np.diag(self.adjacency_matrix.sum(axis=1).A1)
+        self.is_sparse = issparse(self.adjacency)
+        
+        if self.is_sparse:
+            degree_vec = self.adjacency.sum(axis=1).A1
         else:
-            D = np.diag(self.adjacency_matrix.sum(axis=1))
-        print("D", D)
-        P = np.linalg.inv(D) @ self.adjacency_matrix
-        P_gamma=gamma*P + ((1-gamma)*1/self.N)*np.ones((self.N,self.N))
-        v=(((1/self.N)*np.matmul(np.ones((1,self.N)),np.linalg.matrix_power(P_gamma,t)))**alpha).transpose()
-        D_v = np.diag(v.flatten())  
-        xi = P.transpose() @ v
-        D_xi = np.diag(xi.flatten())
+            degree_vec = self.adjacency.sum(axis=1)
+        P = self.adjacency / degree_vec
+
+        if standard:
+            v = degree_vec / degree_vec.sum()
+            xi = np.zeros(self.N)
+        else:
+            t,alpha,gamma = measure
+            P_gamma_t = self._get_P_gamma(P, gamma, t)
+            v = (((1/self.N) * np.ones((1, self.N)) @ P_gamma_t)**alpha).T.flatten()   
+            xi = P.T @ v
 
         self.natural_transition_matrix = P
-        self.measure_xi_matrix = D_xi
-        self.measure_transition_matrix = D_v
-        print("P", P, "\nD_v", D_v, "\nD_xi", D_xi)
+        self.v_vector = v
+        self.xi_vector = xi
+        self.v_xi_sum = self.v_vector + self.xi_vector
    
-    def D_v_xi(self):
-        """
-        Computes the measure transition matrix D_{v + xi}.
-
-        Returns:
-            ndarray: The measure transition matrix.
-        """
-        D_v = self.measure_transition_matrix
-        D_xi = self.measure_xi_matrix
-        print("+", D_v + D_xi)
-        return D_v + D_xi   
      
-    def inv_sqrt_D_v_xi(self):
+    def inv_sqrt_v_xi_sum(self):
         """
-        Computes the inverse square root of the measure transition matrix D_{v + xi}.
+        Computes the inverse square root of the measure transition vector v + xi.
 
         Returns:
-            ndarray: The inverse square root of the measure transition matrix.
+            ndarray: The inverse square root diagonal vector.
         """
-        return np.diag(1 / np.sqrt(np.diag(self.D_v_xi())))
+        return 1.0 / np.sqrt(self.v_xi_sum)
     
     def unnormalized(self):
         """
         Computes the unnormalized generalized Laplacian matrix L_v = D_{v + xi} - (D_v * P + P^T * D_v)
 
         Returns:
-            tuple(ndarray): (L_v, None)
+            tuple: (L_v, diagonal of L_v)
         """
         P = self.natural_transition_matrix
-        D_v = self.natural_transition_matrix
-        L_v = self.D_v_xi() - (D_v @ P + P.T @ D_v)
-        print("L_v", L_v)
-        return L_v, np.diag(L_v) 
+        
+        
+        if self.is_sparse:
+            D_v_xi = diags_array(self.v_xi_sum)
+            D_v = diags_array(self.v_vector)
+            L_v = D_v_xi - (D_v @ P + P.T @ D_v)
+            diag = L_v.diagonal()
+        else:
+            D_v_xi = np.diag(self.v_xi_sum)
+            D_v = np.diag(self.v_vector)
+            L_v = D_v_xi - (D_v @ P + P.T @ D_v) 
+            diag = np.diag(L_v)
+        
+        return L_v, diag
     
     def normalized(self):
         """
-        Computes the normalized generalized Laplacian matrix L_norm_v = D_{v+xi}^(-1/2)   * L_{v} * D_{v+xi}^(-1/2).
+        Computes the normalized generalized Laplacian matrix L_norm_v = D_{v+xi}^(-1/2) * L_{v} * D_{v+xi}^(-1/2).
 
         Returns:
-            tuple(ndarray): (L_norm_v , None)
+            tuple: (L_norm_v, sqrt(diagonal of D_{v+xi}))
         """
-        L_v = self.unnormalized()[0]
-        inv_sqrt_D_v_xi = self.inv_sqrt_D_v_xi()
-        print("inv_sqrt_D_v_xi", inv_sqrt_D_v_xi.shape)
-        L_norm_v = inv_sqrt_D_v_xi @ L_v @ inv_sqrt_D_v_xi
-        return L_norm_v, np.sqrt(np.diag(self.D_v_xi()))
+        L_v, _ = self.unnormalized()
+        inv_sqrt_v_xi_sum = self.inv_sqrt_v_xi_sum()
+        
+        if self.is_sparse:
+            inv_sqrt_D_v_xi = diags_array(inv_sqrt_v_xi_sum)
+            L_norm_v = inv_sqrt_D_v_xi @ L_v @ inv_sqrt_D_v_xi
+        else:
+            inv_sqrt_D_v_xi = np.diag(inv_sqrt_v_xi_sum)
+            L_norm_v = inv_sqrt_D_v_xi @ L_v @ inv_sqrt_D_v_xi
+            
+        return L_norm_v, np.sqrt(self.v_xi_sum)
 
     def random_walk(self):
         """
         Computes the random walk generalized Laplacian matrix L_rw_v = D_{v+xi}^(-1)*L_v 
 
         Returns:
-            tuple(ndarray): (L_rw_v, D)
+            tuple: (L_rw_v, diagonal of L_rw_v)
         """
-        L_v = self.unnormalized()[0]
-
-        L_rw_v = np.diag(1/np.diag(self.D_v_xi())) @ L_v
-        return L_rw_v, np.diag(L_rw_v)
-
-
+        L_v, _ = self.unnormalized()
+        inv_d_v_xi = 1.0 / self.v_xi_sum
+        
+        if self.is_sparse:
+            inv_D_v_xi = diags_array(inv_d_v_xi)
+            L_rw_v = inv_D_v_xi @ L_v
+            diag = L_rw_v.diagonal()
+        else:
+            inv_D_v_xi = np.diag(inv_d_v_xi)
+            L_rw_v = inv_D_v_xi @ L_v
+            diag = np.diag(L_rw_v)
+            
+        return L_rw_v, diag
     
+    def _get_P_gamma(self, P, gamma, t):
+        """
+         Compute P_gamma and its power for both sparse and dense cases.
+        
+        Args:
+            P: Transition matrix (sparse or dense)
+            gamma: Gamma parameter
+            t: Power parameter
+            
+        Returns:
+            P_gamma^t result as dense matrix
+        """
+        
+        if self.is_sparse:
+                P_dense = P.toarray()
+        else:
+                P_dense = P
+            
+        P_gamma = gamma * P_dense + ((1-gamma) / self.N) * np.ones((self.N, self.N))
+            
+        if t == 1:
+            return P_gamma
+        return np.linalg.matrix_power(P_gamma, t)
+
+
+
+

@@ -24,7 +24,6 @@ from ..utils import (
 from ..utils._arpack import _init_arpack_v0
 from ..utils._param_validation import Interval, StrOptions, validate_params
 from ..utils.extmath import _deterministic_vector_sign_flip
-from ..utils.fixes import laplacian as csgraph_laplacian
 from ._laplacian import Laplacian
 from ..utils.fixes import parse_version, sp_version
 from ..utils.validation import validate_data

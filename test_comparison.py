@@ -96,7 +96,7 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
         n_clusters=params["n_clusters"],
         standard=True,
         affinity="nearest_neighbors",
-        laplacian_method="unnorm",
+        laplacian_method="norm",
         random_state=params["random_state"],
     )
     

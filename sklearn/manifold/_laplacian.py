@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import issparse, diags_array
 from scipy.sparse.linalg import matrix_power
-from ..utils import check_symmetric
+
 
 class Laplacian:
     """

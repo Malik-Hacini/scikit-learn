@@ -7,6 +7,7 @@ import warnings
 from numbers import Integral, Real
 
 import numpy as np
+import time
 from scipy import sparse
 from scipy.linalg import eigh
 from scipy.sparse.csgraph import connected_components
@@ -332,15 +333,16 @@ def _spectral_embedding(
         warnings.warn(
             "Graph is not fully connected, spectral embedding may not work as expected."
         )
-
+    
+    t0= time.time()
     if laplacian_method == "norm":
-        laplacian, dd = Laplacian(adjacency, standard = standard).normalized()
-    if laplacian_method == "random_walk":
+        laplacian, dd = Laplacian(adjacency, standard = standard).normalized()  
+    elif laplacian_method == "random_walk":
         laplacian, dd = Laplacian(adjacency, standard = standard).random_walk()
     else:
         laplacian, dd = Laplacian(adjacency, standard = standard).unnormalized()
-    
-    print("Laplacian:", laplacian)
+    t1 = time.time()
+    print("Laplacian time", laplacian_method, "standard:", standard, t1-t0)
     if eigen_solver == "arpack" or (
         eigen_solver != "lobpcg"
         and (not sparse.issparse(laplacian) or n_nodes < 5 * n_components)
@@ -390,7 +392,6 @@ def _spectral_embedding(
                 #recover u = D^-1/2 x from the eigenvector output x
                 embedding = embedding / dd
                 
-            print("VP", embedding)
         except RuntimeError:
             # When submatrices are exactly singular, an LU decomposition
             # in arpack fails. We fallback to lobpcg

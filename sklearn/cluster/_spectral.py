@@ -724,7 +724,6 @@ class SpectralClustering(ClusterMixin, BaseEstimator):
             connectivity = kneighbors_graph(
                 X, n_neighbors=self.n_neighbors, include_self=True, n_jobs=self.n_jobs,
             )
-            print("connectivity", connectivity)
             if self.standard:
                 self.affinity_matrix_ = 0.5 * (connectivity + connectivity.T)
             else:

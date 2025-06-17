@@ -54,7 +54,6 @@ default_base = {
     "n_clusters": 3,
     "random_state": 42,
 }
-
 datasets = [
     (
         noisy_circles,
@@ -73,7 +72,7 @@ datasets = [
         varied,{},
     ),
     (
-        aniso,{},
+       aniso,{},
     ),
     (blobs, {}),
     (no_structure, {}),
@@ -97,7 +96,7 @@ for i_dataset, (dataset, algo_params) in enumerate(datasets):
         n_clusters=params["n_clusters"],
         standard=True,
         affinity="nearest_neighbors",
-        laplacian_method="norm",
+        laplacian_method="unnorm",
         random_state=params["random_state"],
     )
     

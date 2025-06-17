@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import issparse, diags_array
-
+from scipy.sparse.linalg import matrix_power
+from ..utils import check_symmetric
 
 class Laplacian:
     """
@@ -19,25 +20,24 @@ class Laplacian:
             measure (tuple[float, float, float]) : The parameters of the vertex measure used for the Laplacians, respectively (t, alpha, gamma).   
         """
         self.adjacency = adjacency
-        print("Adjacency Matrix", adjacency)
         self.N = adjacency.shape[0]  # Number of nodes in the graph
         self.measure=measure
+        self.standard = standard
         """Compute the matrices necessary for all generalized Laplacians."""
         self.is_sparse = issparse(self.adjacency)
         
-        if self.is_sparse:
-            degree_vec = self.adjacency.sum(axis=1).A1
-        else:
-            degree_vec = self.adjacency.sum(axis=1)
+        degree_vec = self.adjacency.sum(axis=1).A1 if self.is_sparse else self.adjacency.sum(axis=1)
         P = self.adjacency / degree_vec
-
-        if standard:
-            v = degree_vec / degree_vec.sum()
+        if self.standard:
+            v = degree_vec
             xi = np.zeros(self.N)
         else:
             t,alpha,gamma = measure
-            P_gamma_t = self._get_P_gamma(P, gamma, t)
-            v = (((1/self.N) * np.ones((1, self.N)) @ P_gamma_t)**alpha).T.flatten()   
+            if gamma==1:
+                P_gamma_t = matrix_power(P.copy(), t)
+            else:
+                P_gamma_t = np.linalg.matrix_power((1-gamma)* np.full((self.N, self.N), 1/self.N) + gamma * P, t)
+            v = (np.array(((1/self.N) * np.ones((1, self.N)) @ P_gamma_t)).T.flatten())**alpha
             xi = P.T @ v
 
         self.natural_transition_matrix = P
@@ -48,25 +48,36 @@ class Laplacian:
     
     def unnormalized(self):
         """
-        Computes the unnormalized generalized Laplacian matrix L_v = D_{v + xi} - (D_v * P + P^T * D_v)
+        Computes the unnormalized generalized Laplacian matrix L_v = D_{v + xi} - 1/2 * (D_v * P + P^T * D_v)
 
         Returns:
             tuple: (L_v, diagonal of L_v)
         """
-        P = self.natural_transition_matrix
-        
-        
+
         if self.is_sparse:
-            D_v_xi = diags_array(self.v_xi_sum)
             D_v = diags_array(self.v_vector)
+            if self.standard:
+                L_v = D_v - self.adjacency
+            else:
+                D_v_xi = diags_array(self.v_xi_sum)
+                D_times_P = D_v @ self.natural_transition_matrix
+                L_v = D_v_xi - (D_times_P + D_times_P.T)
             
+            diag = L_v.diagonal()
+    
+        
         else:
-            D_v_xi = np.diag(self.v_xi_sum)
-            D_v = np.diag(self.v_vector)
-        
-        L_v = D_v_xi - (D_v @ P + P.T @ D_v)
-        diag = L_v.diagonal() if self.is_sparse else np.diag(L_v)
-        
+            if self.standard:
+                L_v = self.adjacency * -1
+                np.fill_diagonal(L_v, self.v_vector + np.diag(L_v))
+            else:
+                P = self.natural_transition_matrix
+                D_times_P = self.v_vector[:, np.newaxis] * P
+                L_v = (D_times_P + D_times_P.T)* -1
+                np.fill_diagonal(L_v, self.v_xi_sum + np.diag(L_v))
+            
+            diag = np.diag(L_v)
+
         return L_v, diag
     
     def normalized(self):
@@ -94,31 +105,3 @@ class Laplacian:
         diag = L_rw_v.diagonal() if self.is_sparse else np.diag(L_rw_v)
             
         return L_rw_v, diag
-    
-    def _get_P_gamma(self, P, gamma, t):
-        """
-         Compute P_gamma and its power for both sparse and dense cases.
-        
-        Args:
-            P: Transition matrix (sparse or dense)
-            gamma: Gamma parameter
-            t: Power parameter
-            
-        Returns:
-            P_gamma^t result as dense matrix
-        """
-        
-        if self.is_sparse:
-                P_dense = P.toarray()
-        else:
-                P_dense = P
-            
-        P_gamma = gamma * P_dense + ((1-gamma) / self.N) * np.ones((self.N, self.N))
-            
-        if t == 1:
-            return P_gamma
-        return np.linalg.matrix_power(P_gamma, t)
-
-
-
-
